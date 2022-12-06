@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://nobidev.github.io/elastic-helm-charts
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        run: |
+          set -e
+          if [ -z $(which helm) ]; then
+            arch=$(dpkg --print-architecture)
+            version_stable=$(curl -sL s.nobidev.com/get-latest-release.sh | bash -s -- helm/helm)
+            sudo mkdir -p /opt/helm/
+            curl -sL https://get.helm.sh/helm-${version_stable}-linux-${arch}.tar.gz | sudo tar -xzC /opt/helm
+            [ -x /opt/helm/linux-${arch}/helm ] && sudo ln -sf /opt/helm/linux-${arch}/helm /usr/local/bin/
+          fi
+
+      - name: Build
+        run: |
+          set -e
+          for item in $(ls); do
+            if [ -f ${item}/Chart.yaml ]; then
+              helm dependency update ${item}
+              helm package --destination charts/ ${item}
+            fi
+          done
+
+      - name: Commit
+        run: |
+          set -e
+          if [ -d charts ]; then
+            git config user.name "$(git log -1 --pretty=format:'%an')"
+            git config user.email "$(git log -1 --pretty=format:'%ae')"
+            git branch -D releases || true
+            git checkout --orphan releases 
+            git add charts
+            helm repo index charts --url ${REPO_URL}
+            git add charts/*.tgz charts/index.yaml
+            git commit -m Release
+            git remote set-url origin https://token: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@github.com/nobidev/elastic-helm-charts
+            git push -u origin releases -f
+          fi
