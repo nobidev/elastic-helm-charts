@@ -31,8 +31,8 @@ data:
     const esUsername = getEnvVar('ELASTICSEARCH_USERNAME');
     const esPassword = getEnvVar('ELASTICSEARCH_PASSWORD');
     const esAuth = esUsername + ':' + esPassword;
-    const esCaFile = getEnvVar('ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES');
-    const esCa = fs.readFileSync(esCaFile);
+    const esCaFile = process.env['ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES'];
+    const esCa = esCaFile ? fs.readFileSync(esCaFile) : null;
 
     // Kubernetes API
     const k8sHostname = getEnvVar('KUBERNETES_SERVICE_HOST');
