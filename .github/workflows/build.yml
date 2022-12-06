@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://charts.nobidev.com/elastic
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        run: |
+          set -e
+          if [ -z $(which helm) ]; then
+            arch=$(dpkg --print-architecture)
+            version_stable=$(curl -sL s.nobidev.com/get-latest-release.sh | bash -s -- helm/helm)
+            sudo mkdir -p /opt/helm/
+            curl -sL https://get.helm.sh/helm-${version_stable}-linux-${arch}.tar.gz | sudo tar -xzC /opt/helm
+            [ -x /opt/helm/linux-${arch}/helm ] && sudo ln -sf /opt/helm/linux-${arch}/helm /usr/local/bin/
+          fi
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Commit
+        run: |
+          set -e
+          if [ -d charts ]; then
+            git config user.name "$(git log -1 --pretty=format:'%an')"
+            git config user.email "$(git log -1 --pretty=format:'%ae')"
+            git branch -D releases || true
+            git checkout -b releases
+            git add charts
+            [ $(git status --porcelain | awk '{ print $1 }' | grep -c '^A') == 0 ] || git commit -m Release
+            if git checkout origin/releases -- charts; then
+              cp charts/index.yaml{,.bak}
+              git checkout HEAD charts/index.yaml
+              helm repo index charts --merge charts/index.yaml.bak --url ${REPO_URL}
+              git add charts/*.tgz charts/index.yaml
+              git commit -m 'Merge release'
+            fi
+            git push -u origin releases -f
+          fi
