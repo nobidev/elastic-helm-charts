@@ -35,8 +35,10 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.elasticsearchCredentialSecret }}
                   key: password
+            {{- if .Values.elasticsearchCertificateSecret }}
             - name: ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES
               value: "{{ template "kibana.home_dir" . }}/config/certs/{{ .Values.elasticsearchCertificateAuthoritiesFile }}"
+            {{- end }}
           volumeMounts:
             {{- if .Values.elasticsearchCertificateSecret }}
             - name: elasticsearch-certs
